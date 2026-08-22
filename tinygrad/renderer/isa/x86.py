@@ -295,16 +295,11 @@ def fold_address(x:UOp) -> tuple[UOp, UOp, UOp, UOp]:
 
 def abi(ctx:IselContext, x:UOp) -> UOp|None:
   if isinstance(x.tag, tuple): return None
-  slots = list(dict.fromkeys(u.arg.slot for u in ctx.func_args if u.op is Ops.PARAM))
-  if x.op is Ops.PARAM: i = slots.index(x.arg.slot)
-  else: i = len(slots) + [u for u in ctx.func_args if u.op is Ops.SPECIAL].index(x)
+  i = ctx.func_args.index(x)
   # buffer params hold addresses, their value moves as a 64bit int
   dt = dtypes.uint64 if x.op is Ops.PARAM and x.arg.addrspace is AddrSpace.GLOBAL else x.dtype
   # the shape srcs of a PARAM are not values, tag them so they aren't materialized into registers
-  def _reg_arg(r:Register) -> tuple[UOp, ...]:
-    key = x.arg.slot if x.op is Ops.PARAM else x.arg
-    if key not in ctx.abi_args: ctx.abi_args[key] = x.replace(dtype=dt, src=tuple(s.rtag() for s in x.src), tag=(r,))
-    return (ctx.abi_args[key],)
+  def _reg_arg(r:Register) -> tuple[UOp, ...]: return (x.replace(dtype=dt, src=tuple(s.rtag() for s in x.src), tag=(r,)),)
   def _stack_arg(disp:int):
     return (def_reg(dtypes.uint64, RSP), UOp(Ops.NOOP), UOp(Ops.INS, arg=X86Ops.FRAME_INDEX, dtype=dtypes.int32, tag=disp), imm(dtypes.uint8, 8))
   if sys.platform == "win32": src = _reg_arg((RCX, RDX, GPR[8], GPR[9])[i]) if i < 4 else _stack_arg((i-3)*8+32)
