@@ -16,9 +16,10 @@ class Register:
 
 class IselContext:
   def __init__(self, sink:UOp):
-    self.uses = consumer_map_from_toposort(sink.toposort())
+    ts = sink.toposort()
+    self.uses = consumer_map_from_toposort(ts)
     self.reg_n = itertools.count()
-    self.func_args = [u for u in sink.src if u in self.uses and u.op is Ops.PARAM]
+    self.func_args = [u for u in ts if u in self.uses and u.op is Ops.PARAM]
     self.func_args += sorted([u for u in self.uses if u.op is Ops.SPECIAL], key=lambda u: u.arg)
 
   def vreg(self, cons:tuple[Register, ...]|Register):
