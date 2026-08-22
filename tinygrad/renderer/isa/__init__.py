@@ -15,12 +15,13 @@ class Register:
   def __repr__(self): return self.name
 
 class IselContext:
-  def __init__(self, sink:UOp):
+  def __init__(self, sink:UOp, param_order:list[UOp]|None=None):
     ts = sink.toposort()
     self.uses = consumer_map_from_toposort(ts)
     self.reg_n = itertools.count()
-    self.func_args = [u for u in ts if u in self.uses and u.op is Ops.PARAM]
-    self.func_args += sorted([u for u in self.uses if u.op is Ops.SPECIAL], key=lambda u: u.arg)
+    src = param_order if param_order is not None else ts
+    self.func_args = [u for u in src if u in self.uses and u.op is Ops.PARAM]
+    self.func_args += sorted((u for u in self.uses if u.op is Ops.SPECIAL), key=lambda u: u.arg)
 
   def vreg(self, cons:tuple[Register, ...]|Register):
     return Register(f"v{next(self.reg_n)}", 0, _cons=cons if isinstance(cons, tuple) else (cons,))
