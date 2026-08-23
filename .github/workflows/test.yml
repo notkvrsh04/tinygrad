@@ -468,10 +468,6 @@ jobs:
         python -c "from tinygrad import Device; from tinygrad.helpers import Target; assert Device.DEFAULT == Target.parse('${{ matrix.dev }}').device"
         DEBUG=4 python test/test_tiny.py TestTiny.test_plus
     - name: Run backend tests
-      if: matrix.dev != 'CPU:X86'
-      run: python -m pytest -n=auto test/backend --durations=20
-    - name: Run backend tests
-      if: matrix.dev == 'CPU:X86'
       run: python -m pytest -n=auto -s test/backend --durations=20
     - name: Dump X86 ABI log
       if: always() && matrix.dev == 'CPU:X86'
