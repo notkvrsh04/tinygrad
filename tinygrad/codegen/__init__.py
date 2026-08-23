@@ -2,7 +2,6 @@ from dataclasses import replace, dataclass
 import itertools, functools
 from tinygrad.helpers import DISABLE_FAST_IDIV, TRANSCENDENTAL, SPEC, DEBUG, VIZ, IMAGE, NOOPT, EMULATED_DTYPES, NOLOCALS, USE_TC
 from tinygrad.helpers import ALLOW_TF32, DEFAULT_FLOAT, DEFAULT_INT, NUM_CPU_THREADS, TC_SELECT, TC_OPT, TracingKey, Context, panic
-from tinygrad.helpers import ABI_DEBUG, abi_log, abi_want
 from tinygrad.uop.ops import PatternMatcher, graph_rewrite, UOp, Ops, UPat, rewrite_group, KernelInfo, ProgramInfo, GroupOp, AxisType
 from tinygrad.uop.weak import pm_lower_index_dtype, pm_commit_weak, pm_cast_weak
 from tinygrad.uop.render import pyrender
@@ -482,14 +481,8 @@ def do_to_program(ast:UOp, renderer:Renderer) -> UOp:
     # instruction selection
     if isinstance(renderer, ISARenderer):
       full_sink = graph_rewrite(full_sink, renderer.pre_isel_matcher, ctx=itertools.count(-1, -1), name="pre instruction selection", bottom_up=True)
-    param_order = tuple(dict.fromkeys(u for u in linearize(full_sink) if u.op is Ops.PARAM))
-    prog_info = replace(prog_info, params=param_order)
-    if ABI_DEBUG:
-      slots, ibs = [u.arg.slot for u in param_order], [u.addrspace != AddrSpace.ALU for u in param_order]
-      if abi_want(slots, ibs):
-        abi_log("STAMP", prog_info.name, f"{prog_info.name} params={[(u.arg.name, u.arg.slot, u.addrspace.name) for u in param_order]} "
-                f"globals={prog_info.globals} var_slots={[v.arg.slot for v in prog_info.vars]}")
     param_order = list(dict.fromkeys(u for u in linearize(full_sink) if u.op is Ops.PARAM))
+    prog_info = replace(prog_info, params=tuple(param_order))
     if isinstance(renderer, ISARenderer):
       full_sink = graph_rewrite(full_sink, renderer.isel_matcher, ctx=IselContext(full_sink,param_order=param_order),
                                 name="instruction selection", bottom_up=True)
@@ -503,7 +496,7 @@ def do_to_program(ast:UOp, renderer:Renderer) -> UOp:
 # config affects generated programs and cache keys; context also carries compile-only behavior to workers
 to_program_config = (NOOPT, EMULATED_DTYPES, NOLOCALS, USE_TC, IMAGE, DISABLE_FAST_IDIV, TRANSCENDENTAL, ALLOW_TF32,
                      DEFAULT_FLOAT, DEFAULT_INT, NUM_CPU_THREADS, TC_SELECT, TC_OPT)
-to_program_context = (*to_program_config, SPEC, DEBUG, ABI_DEBUG)
+to_program_context = (*to_program_config, SPEC, DEBUG)
 def to_program_key(ast:UOp, renderer:Renderer) -> tuple:
   return (ast.key, type(renderer), renderer.target, *[x.value for x in to_program_config])
 

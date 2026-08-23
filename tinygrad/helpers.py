@@ -273,30 +273,6 @@ SPEC = ContextVar("SPEC", 1)
 CHECK_OOB = ContextVar("CHECK_OOB", 0)
 PCONTIG = ContextVar("PCONTIG", 0)  # partial contiguous in rangeify
 DEBUG_RANGEIFY = ContextVar("DEBUG_RANGEIFY", 0)
-ABI_DEBUG = ContextVar("ABI_DEBUG", 0)
-_abi_seen: set[str] = set()
-_abi_fd: int|None = None
-def abi_want(slots:Sequence[int], is_buf:Sequence[bool], idxs:Sequence[int]|None=None) -> bool:
-  if ABI_DEBUG >= 2: return True
-  if not ABI_DEBUG: return False
-  if len(slots) > 6 or len(slots) != len(set(slots)): return True
-  if any(is_buf[i] and not is_buf[i-1] for i in range(1, len(is_buf))): return True
-  if idxs is not None:
-    g = sorted({s for s,b in zip(slots, is_buf) if b})
-    v = sorted({s for s,b in zip(slots, is_buf) if not b})
-    if any(i != (g.index(s) if b else v.index(s)) for s,b,i in zip(slots, is_buf, idxs)): return True
-  return False
-def abi_log(tag:str, key:str, msg:str):
-  if not ABI_DEBUG: return
-  ident = f"{tag}:{key}"
-  if ABI_DEBUG < 2 and ident in _abi_seen: return
-  _abi_seen.add(ident)
-  line = f"{tag} {msg}\n"
-  stderr_log(line)
-  if not (path:=os.getenv("ABI_LOG")): return
-  global _abi_fd
-  if _abi_fd is None: _abi_fd = os.open(path, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0o644)
-  os.write(_abi_fd, line.encode())
 # set to 1, this uses tuplize in the linearizer sort order
 TUPLE_ORDER = ContextVar("TUPLE_ORDER", 1)
 # set to 0 to disable the compiler cache

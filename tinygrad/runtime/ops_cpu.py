@@ -3,7 +3,6 @@ import platform, sys, os, ctypes, functools, mmap, threading, array, struct, tim
 from dataclasses import dataclass, replace
 from typing import cast, Callable
 from tinygrad.helpers import to_mv, from_mv, OSX, WIN, Context, mv_address, suppress_finalizing, unwrap, data64_le, to_tuple
-from tinygrad.helpers import ABI_DEBUG, abi_log, abi_want
 from tinygrad.device import Buffer, BufferSpec, TinyELF, Program, Device
 from tinygrad.runtime.support.hcq import HCQBuffer, MMIOInterface
 from tinygrad.runtime.support.hcq2 import HCQ2Compiled, HCQAllocator, make_cmdbuf, make_signal
@@ -164,27 +163,22 @@ class CPUProgram(Program['CPUDevice']):
         struct.pack_into('<Q' if is_buf else f'<{dt.fmt}', lvp_args, 12+o, bufs[idx].va_addr if is_buf else vals[idx])
       self.fxn(addr)
     else:
-      if self.x86:
-        g = sorted({s for _,s,_,_,ib,_ in self.signature if ib})
-        v = sorted({s for _,s,_,_,ib,_ in self.signature if not ib})
-        args, arg_slots, seen = [], [], set()
-        for _, slot, _, _, is_buf, idx in self.signature:
-          if slot in seen: continue
-          seen.add(slot)
-          arg_slots.append(slot)
-          args.append(cast(int, bufs[g.index(slot)].va_addr if is_buf else vals[v.index(slot)]))
-        if ABI_DEBUG:
-          slots, ibs, idxs = zip(*[(s,ib,idx) for _,s,_,_,ib,idx in self.signature]) if self.signature else ((),(),())
-          if len(bufs)!=len(g) or len(vals)!=len(v) or abi_want(slots, ibs, idxs):
-            abi_log("CALL", self.name, f"{self.name} nbufs={len(bufs)} nvals={len(vals)} "
-                    f"sig={[(n,s,ib,idx) for n,s,_,_,ib,idx in self.signature]} pack_slots={arg_slots} g={g} v={v} "
-                    f"idx_vs_g={[(s,idx,(g.index(s) if is_buf else v.index(s))) for _,s,_,_,is_buf,idx in self.signature]}")
-      else:
-        args = [cast(int,bufs[idx].va_addr if is_buf else vals[idx]) for *_,_,is_buf,idx in self.signature]
+      #if self.x86:
+      #  g = sorted({s for _,s,_,_,ib,_ in self.signature if ib})
+      #  v = sorted({s for _,s,_,_,ib,_ in self.signature if not ib})
+      #  args, arg_slots, seen = [], [], set()
+      #  for _, slot, _, _, is_buf, _ in self.signature:
+      #    if slot in seen: continue
+      #    seen.add(slot)
+      #    arg_slots.append(slot)
+      #    args.append(cast(int, bufs[g.index(slot)].va_addr if is_buf else vals[v.index(slot)]))
+      #  else:
+      args = [cast(int,bufs[idx].va_addr if is_buf else vals[idx]) for *_,_,is_buf,idx in self.signature]
       assert len(args) <= MAX_ARGS, f"CPU programs support at most {MAX_ARGS} arguments, got {len(args)}"
       for tid in range(global_size[0]):
         if 'core_id' in self.runtimevars:
-          args[arg_slots.index(self.runtimevars['core_id']) if self.x86 else self.runtimevars['core_id']] = tid
+          args[self.runtimevars['core_id']] = tid
+          #args[arg_slots.index(self.runtimevars['core_id']) if self.x86 else self.runtimevars['core_id']] = tid
         self.fxn(*[ctypes.c_uint64(x) for x in args])
     return time.perf_counter() - st if wait else None
 

@@ -3,7 +3,6 @@ from typing import cast, Iterator, Any, Sequence
 import random, itertools, math, weakref, array, decimal
 from dataclasses import dataclass, replace, field
 from tinygrad.helpers import colored, DEBUG, GlobalCounters, ansipad, all_int, prod, flatten, Context, getenv, to_tuple, tqdm
-from tinygrad.helpers import ABI_DEBUG, abi_log, abi_want
 from tinygrad.helpers import BEAM, size_to_str, time_to_str, VALIDATE_WITH_CPU, PROFILE, ProfilePointEvent, cpu_events, perf_counter_us
 from tinygrad.uop.ops import Ops, PatternMatcher, UOp, UPat, AxisType, sym_infer, graph_rewrite, ProgramInfo
 from tinygrad.device import Device, Buffer, MultiBuffer, ProfileGraphEntry
@@ -186,11 +185,6 @@ def exec_kernel(ctx:ExecContext, call:UOp, ast:UOp) -> list[float|None]:
     prg_bufs = [b.ensure_allocated() for b in bufs]
     rt = get_runtime(device, ast, cache=ctx.cache)
     global_size, local_size = ast.arg.launch_dims(var_vals)
-    if ABI_DEBUG:
-      ps = ast.arg.params
-      if (not ps) or abi_want([u.arg.slot for u in ps], [u.addrspace != AddrSpace.ALU for u in ps]):
-        abi_log("LAUNCH", ast.arg.function_name, f"{ast.arg.function_name} globals={ast.arg.globals} nbufs={len(prg_bufs)} "
-                f"vals={ast.arg.vals(var_vals)}")
     ets.append(rt(*[b.get_buf(device) for b in prg_bufs], global_size=global_size, local_size=local_size, vals=ast.arg.vals(var_vals),
                   wait=ctx.wait, timeout=ctx.timeout))
   return ets
