@@ -6,7 +6,7 @@ from tinygrad.helpers import colored, DEBUG, GlobalCounters, ansipad, all_int, p
 from tinygrad.helpers import BEAM, size_to_str, time_to_str, VALIDATE_WITH_CPU, PROFILE, ProfilePointEvent, cpu_events, perf_counter_us
 from tinygrad.uop.ops import Ops, PatternMatcher, UOp, UPat, AxisType, sym_infer, graph_rewrite, ProgramInfo
 from tinygrad.device import Device, Buffer, MultiBuffer, ProfileGraphEntry
-from tinygrad.dtype import dtypes, AddrSpace
+from tinygrad.dtype import dtypes
 from tinygrad.renderer import Estimates, Renderer
 from tinygrad.codegen import to_program, to_program_cache, to_program_key, to_program_context
 from tinygrad.codegen.opt.postrange import args_from_ast
