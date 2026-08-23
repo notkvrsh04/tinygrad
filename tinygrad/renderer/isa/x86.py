@@ -295,7 +295,9 @@ def fold_address(x:UOp) -> tuple[UOp, UOp, UOp, UOp]:
 
 def abi(ctx:IselContext, x:UOp) -> UOp|None:
   if isinstance(x.tag, tuple): return None
-  i = ctx.func_args.index(x)
+  slots = list(dict.fromkeys(u.arg.slot for u in ctx.func_args if u.op is Ops.PARAM))
+  if x.op is Ops.PARAM: i = slots.index(x.arg.slot)
+  else: i = len(slots) + [u for u in ctx.func_args if u.op is Ops.SPECIAL].index(x)
   # buffer params hold addresses, their value moves as a 64bit int
   dt = dtypes.uint64 if x.op is Ops.PARAM and x.arg.addrspace is AddrSpace.GLOBAL else x.dtype
   # the shape srcs of a PARAM are not values, tag them so they aren't materialized into registers

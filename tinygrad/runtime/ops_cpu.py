@@ -120,6 +120,7 @@ class CPUProgram(Program['CPUDevice']):
     self.dev, self.name, self.signature = dev, obj.name, obj.signature
     self.runtimevars = {name:slot for name,slot,*_ in obj.signature if name == 'core_id'}
     self.lvp = obj.target.renderer == "LVP"
+    self.x86 = obj.target.renderer == "X86"
 
     if sys.platform == "win32": # mypy doesn't understand when WIN is used here
       PAGE_EXECUTE_READWRITE, MEM_COMMIT, MEM_RESERVE = 0x40, 0x1000, 0x2000
@@ -162,10 +163,21 @@ class CPUProgram(Program['CPUDevice']):
         struct.pack_into('<Q' if is_buf else f'<{dt.fmt}', lvp_args, 12+o, bufs[idx].va_addr if is_buf else vals[idx])
       self.fxn(addr)
     else:
-      args = [cast(int,bufs[idx].va_addr if is_buf else vals[idx]) for *_,_,is_buf,idx in self.signature]
+      if self.x86:
+        g = sorted({s for _,s,_,_,ib,_ in self.signature if ib})
+        v = sorted({s for _,s,_,_,ib,_ in self.signature if not ib})
+        args, arg_slots, seen = [], [], set()
+        for _, slot, _, _, is_buf, idx in self.signature:
+          if slot in seen: continue
+          seen.add(slot)
+          arg_slots.append(slot)
+          args.append(cast(int, bufs[g.index(slot)].va_addr if is_buf else vals[v.index(slot)]))
+      else:
+        args = [cast(int,bufs[idx].va_addr if is_buf else vals[idx]) for *_,_,is_buf,idx in self.signature]
       assert len(args) <= MAX_ARGS, f"CPU programs support at most {MAX_ARGS} arguments, got {len(args)}"
       for tid in range(global_size[0]):
-        if 'core_id' in self.runtimevars: args[self.runtimevars['core_id']] = tid
+        if 'core_id' in self.runtimevars:
+          args[arg_slots.index(self.runtimevars['core_id']) if self.x86 else self.runtimevars['core_id']] = tid
         self.fxn(*[ctypes.c_uint64(x) for x in args])
     return time.perf_counter() - st if wait else None
 
