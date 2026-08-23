@@ -11,6 +11,7 @@ from tinygrad.helpers import ContextVar, all_int, prod, getenv, all_same, Contex
 from tinygrad.helpers import PROFILE, dedup, cdiv, cmod, floordiv, floormod, diskcache_put, to_function_name, cpu_profile, TracingKey
 from tinygrad.helpers import VIZ, SPEC, CAPTURE_PROCESS_REPLAY, DISALLOW_BROADCAST, get_shape, fully_flatten, to_tuple
 from tinygrad.helpers import colored, ansilen, printable, Target, is_image_shape
+from tinygrad.helpers import ABI_DEBUG, abi_log, abi_want
 if TYPE_CHECKING:
   from tinygrad.renderer import Estimates
 
@@ -1197,6 +1198,12 @@ class UOp(RandMixin, metaclass=UOpMetaClass):
     params = self.arg.params or [u for u in self.src[1].src if u.op is Ops.PARAM] or [u for u in self.src[0].src if u.op is Ops.PARAM]
     sig = tuple((u.arg.name, u.arg.slot, u.dtype, u._shape, (is_buf:=u.addrspace!=AddrSpace.ALU), next(bc if is_buf else vc))
             for u in params if u.op is Ops.PARAM)
+    if ABI_DEBUG:
+      src = [(u.arg.name, u.arg.slot, u.addrspace.name) for u in params if u.op is Ops.PARAM]
+      slots, ibs, idxs = [s[1] for s in sig], [s[4] for s in sig], [s[5] for s in sig]
+      if not self.arg.params or abi_want(slots, ibs, idxs):
+        abi_log("TO_ELF", self.arg.function_name, f"{self.arg.function_name} params_empty={not self.arg.params} src={src} "
+                f"sig={[(n,s,ib,idx) for n,s,_,_,ib,idx in sig]}")
     return TinyELF(self.src[3].arg, self.arg.function_name, self.arg.target, sig, self.key)
 
 @dataclass(frozen=True)

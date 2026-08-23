@@ -462,13 +462,16 @@ jobs:
         webgpu: ${{ matrix.dev == 'WEBGPU' }}
         opencl: ${{ matrix.dev == 'CL' }}
     - name: Set env
-      run: printf "DEV=${{ matrix.dev }}${{ matrix.dev == 'CPU:CLANG' && '\nCPU_COUNT=2' || '' }}" >> $GITHUB_ENV
+      run: printf "DEV=${{ matrix.dev }}${{ matrix.dev == 'CPU:CLANG' && '\nCPU_COUNT=2' || '' }}${{ matrix.dev == 'CPU:X86' && '\nPYTHONUNBUFFERED=1\nPYTHONFAULTHANDLER=1\nABI_DEBUG=1\nABI_LOG=/tmp/tinygrad_abi.log' || '' }}" >> $GITHUB_ENV
     - name: Check Device.DEFAULT and print some source
       run: |
         python -c "from tinygrad import Device; from tinygrad.helpers import Target; assert Device.DEFAULT == Target.parse('${{ matrix.dev }}').device"
         DEBUG=4 python test/test_tiny.py TestTiny.test_plus
     - name: Run backend tests
-      run: python -m pytest -n=auto test/backend --durations=20
+      run: python -m pytest -n=auto ${{ matrix.dev == 'CPU:X86' && '-s' || '' }} test/backend --durations=20
+    - name: Dump X86 ABI log
+      if: always() && matrix.dev == 'CPU:X86'
+      run: test -f "$ABI_LOG" && cat "$ABI_LOG" || echo "no ABI_LOG"
     - name: Run process replay tests
       uses: ./.github/actions/process-replay
 

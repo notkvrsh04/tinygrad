@@ -3,6 +3,7 @@ import platform, sys, os, ctypes, functools, mmap, threading, array, struct, tim
 from dataclasses import dataclass, replace
 from typing import cast, Callable
 from tinygrad.helpers import to_mv, from_mv, OSX, WIN, Context, mv_address, suppress_finalizing, unwrap, data64_le, to_tuple
+from tinygrad.helpers import ABI_DEBUG, abi_log, abi_want
 from tinygrad.device import Buffer, BufferSpec, TinyELF, Program, Device
 from tinygrad.runtime.support.hcq import HCQBuffer, MMIOInterface
 from tinygrad.runtime.support.hcq2 import HCQ2Compiled, HCQAllocator, make_cmdbuf, make_signal
@@ -172,6 +173,12 @@ class CPUProgram(Program['CPUDevice']):
           seen.add(slot)
           arg_slots.append(slot)
           args.append(cast(int, bufs[g.index(slot)].va_addr if is_buf else vals[v.index(slot)]))
+        if ABI_DEBUG:
+          slots, ibs, idxs = zip(*[(s,ib,idx) for _,s,_,_,ib,idx in self.signature]) if self.signature else ((),(),())
+          if len(bufs)!=len(g) or len(vals)!=len(v) or abi_want(slots, ibs, idxs):
+            abi_log("CALL", self.name, f"{self.name} nbufs={len(bufs)} nvals={len(vals)} "
+                    f"sig={[(n,s,ib,idx) for n,s,_,_,ib,idx in self.signature]} pack_slots={arg_slots} g={g} v={v} "
+                    f"idx_vs_g={[(s,idx,(g.index(s) if is_buf else v.index(s))) for _,s,_,_,is_buf,idx in self.signature]}")
       else:
         args = [cast(int,bufs[idx].va_addr if is_buf else vals[idx]) for *_,_,is_buf,idx in self.signature]
       assert len(args) <= MAX_ARGS, f"CPU programs support at most {MAX_ARGS} arguments, got {len(args)}"

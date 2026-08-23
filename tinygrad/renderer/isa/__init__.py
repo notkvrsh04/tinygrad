@@ -3,6 +3,8 @@ import itertools
 from dataclasses import dataclass, field
 from tinygrad.renderer import Renderer
 from tinygrad.uop.ops import PatternMatcher, UOp, Ops, consumer_map_from_toposort
+from tinygrad.dtype import AddrSpace
+from tinygrad.helpers import ABI_DEBUG, abi_log, abi_want
 
 @dataclass(frozen=True)
 class Register:
@@ -22,6 +24,13 @@ class IselContext:
     src = param_order if param_order is not None else ts
     self.func_args = [u for u in src if u in self.uses and u.op is Ops.PARAM]
     self.func_args += sorted((u for u in self.uses if u.op is Ops.SPECIAL), key=lambda u: u.arg)
+    if ABI_DEBUG:
+      ps = [u for u in self.func_args if u.op is Ops.PARAM]
+      if abi_want([u.arg.slot for u in ps], [u.addrspace != AddrSpace.ALU for u in ps]):
+        rows = [(u.op.name, getattr(u.arg,'name',None), getattr(u.arg,'slot',u.arg),
+                 getattr(getattr(u.arg,'addrspace',None),'name',None)) for u in self.func_args]
+        name = getattr(sink.arg, "name", "?")
+        abi_log("FUNC_ARGS", name, f"{name} {rows}")
 
   def vreg(self, cons:tuple[Register, ...]|Register):
     return Register(f"v{next(self.reg_n)}", 0, _cons=cons if isinstance(cons, tuple) else (cons,))
